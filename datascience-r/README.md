@@ -1,6 +1,6 @@
 # Data Science Exercises in R
 
-This repository contains a series of individual data science assignments done in R. Each task focuses on a different aspect of the data analysis workflow — from cleaning and exploring datasets to choosing the right visualizations to communicate insights.
+This repository contains a series of individual data science assignments completed in R. Each task focuses on a specific part of the data analysis workflow — from data cleaning and visualization to modeling and interpretation.
 
 ---
 
@@ -17,25 +17,26 @@ This assignment explores how to use `ggplot2` to create **effective visualizatio
 
 ---
 
-## 🔧 Reproducing the Report
+## 🧼 HW2: Data Cleaning and Statistical Insights
 
-To view or regenerate the report locally:
+This assignment focuses on cleaning a messy dataset and using **statistical summaries** and **visual analysis** to draw meaningful conclusions. It includes:
+- Handling missing values and outliers
+- Filtering and transforming variables
+- Exploring relationships using summary statistics
+- Visualizing distributions and trends clearly and effectively
 
-1. Install **R** and **RStudio**
-2. Required R packages:
-   - `tidyverse`
-   - `ggplot2`
-   - `dplyr`
-   - `readr`
-3. Open the `.Rmd` file and click **Knit** to generate an HTML report
+🌐 [View HW2 Report (HTML)](https://dorbenit.github.io/DataScience-Exercises-R/HW2.html)
 
 ---
 
-## 📌 Notes
+## 🎯 HW3: Predicting IMDb Ratings for *The Office* Episodes
 
-- All assignments are individual and follow a clean RMarkdown structure
-- New assignments will be added as additional commits
+This assignment aims to build a predictive model for IMDb ratings of *The Office* episodes:
+- Feature engineering from categorical and numeric episode data
+- Creating indicators for holiday episodes and main characters
+- Using linear regression to predict IMDb ratings
+- Evaluating model performance and variable significance
 
-## 📄 License
+🌐 [View HW3 Report (HTML)](https://dorbenit.github.io/DataScience-Exercises-R/HW3.html)
 
-For educational use and portfolio presentation.
+---
