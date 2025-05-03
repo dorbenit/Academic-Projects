@@ -1,0 +1,487 @@
+---
+title: "Homework 2"
+
+---
+
+
+### Instructions
+
+1.  All assignments are individual!
+2.  This assignment should be uploaded as two files: "rmd" and "html" (after knit) before the next Tutorial
+3.  There are questions for two different datasets in this assignment, if you want to pass it, you must complete all of them.
+4.  Questions about the assignment should be asked using the Assignments forums.
+5.  All of the instructions of this assignment should be included in the final .html file.
+
+
+Use **ggplot2** and **dplyr** for data analysis and visualization. Clearly organize your assignment into sections and include appropriate text and code chunks.
+
+---
+
+# Dataset 1: Admissions (60%)
+
+You are provided with the dataset **`admissions.csv`**, containing data about Master's program applicants, their test scores, and acceptance status.
+```{r}
+library(DescTools)
+library(tidyverse)
+library(ggplot2)
+```
+## Part 1: Informative Analysi
+
+```{r}
+admission <- read.csv("admission.csv")
+head(admission,5)
+summary(admission)
+str(admission)
+colSums(is.na(admission))
+sapply(admission[c("GRE.Score", "TOEFL.Score", "SOP", "CGPA")], sd)
+sapply(admission[c("GRE.Score", "TOEFL.Score", "SOP", "CGPA")], sd, na.rm = TRUE)
+admission %>%
+  group_by(Research) %>%
+  summarise(mean_cgpa = mean(CGPA, na.rm = TRUE))
+admission %>%
+  group_by(University.Rating) %>%
+  summarise(mean_toefl = mean(TOEFL.Score, na.rm = TRUE))
+admission %>%
+  filter(!is.na(Research)) %>%
+  count(Research) %>%
+  mutate(percentage = round(100 * n / sum(n), 1))
+```
+- Provide detailed feature descriptions, including meanings, types, and statistics (mean, median, standard deviation, min, max).
+- Discuss clearly the following relationships:
+  - Mean CGPA difference by research experience.
+  - Mean TOEFL scores by University Ratings.
+  
+1. Serial.No.
+Row number index; serves only as a unique identifier.
+
+Mean: 200.5 | Median: 200.5
+
+Min: 1 | Max: 400
+
+2. GRE.Score
+Graduate Record Examination score – measures general academic ability. Typical range: 260–340.
+
+Mean: 316.8 | Median: 317.0
+
+Min: 290 | Max: 340
+
+Missing values: 6
+
+3. TOEFL.Score
+Test of English as a Foreign Language – measures English proficiency. Range: 0–120.
+
+Mean: 107.4 | Median: 107.0
+
+Min: 92 | Max: 120
+
+Missing values: 0
+
+4. University.Rating
+A rating of the university where the applicant studied (scale: 1–5).
+
+Mean: 3.09 | Median: 3
+
+Min: 1 | Max: 5
+
+Missing values: 0
+
+5. SOP
+Strength of the Statement of Purpose – subjective score given to applicant's personal essay.
+
+Mean: 3.40 | Median: 3.5
+
+Min: 1.0 | Max: 5.0
+
+Missing values: 0
+
+6. CGPA
+Cumulative Grade Point Average from undergraduate studies (scale: 0–10).
+
+Mean: 8.60 | Median: 8.61
+
+Min: 6.80 | Max: 9.92
+
+Missing values: 6
+
+7. Research
+Indicates whether the applicant has research experience.
+Categorical: 1 = Yes, 0 = No
+
+Mean: 0.55 → ~55% have research experience
+
+Missing values: 9
+
+8. Admission
+Indicates whether the applicant was admitted.
+Binary: 1 = Admitted, 0 = Not admitted
+
+Mean: 0.59 → ~59% were admitted
+
+Min: 0 | Max: 1
+
+Missing values: 0
+
+
+
+We can see a gap between students with research experience and those without, with an average CGPA difference of approximately 0.6.
+However, it's important to note that the dataset contains 9 missing CGPA values, and there are more students with research experience than without.
+
+As University Rating increases, the average TOEFL score also rises.
+For example, students admitted to universities rated 5 had a mean TOEFL score of 113.67, compared to just 99.08 in universities rated 1.
+This suggests that higher-ranked universities tend to accept students with stronger English proficiency.
+
+
+## Part 2: Data Processing
+```{r}
+admission_clean <- admission %>%
+  mutate(
+    GRE.Score = replace_na(GRE.Score, median(GRE.Score, na.rm = TRUE)),
+    Research  = replace_na(Research, Mode(Research, na.rm = TRUE)),
+    CGPA      = replace_na(CGPA, mean(CGPA, na.rm = TRUE))
+  )
+```
+
+- Clearly handle missing values with justifications:
+  - GRE Score: Replace missing with median. Why is median preferred here?
+  
+We replaced missing values with the median. This is because GRE scores might include some extreme values, and the median is less affected by outliers than the mean.
+
+  - Research: Replace missing with mode. Explain your reasoning clearly.
+  For this binary (0/1) variable, we used the mode, meaning the most frequent value in the column. Since there are only two possible values, it makes sense to fill in the missing ones with the value that appears more often.
+  
+  - CGPA: Replace missing with mean. Justify your choice of mean here.
+  
+  Missing values in CGPA were replaced with the mean. In this case, the mean and median are nearly identical, and the standard deviation is quite low, which suggests that the values are concentrated around the center and follow an approximately normal distribution. This makes the mean a reliable value for imputation.
+
+
+## Part 3: Data Visualization
+```{r}
+ggplot(admission_clean, aes(x = GRE.Score, fill = factor(Admission))) +
+  geom_histogram(position = "dodge", bins = 20) +
+  labs(title = "GRE Score by Admission Status", x = "GRE Score", y = "Count") +
+  scale_fill_discrete(labels = c("Not Admitted", "Admitted"))
+
+ggplot(admission_clean, aes(x = CGPA , fill = factor(Admission))) +
+  geom_histogram(position = "dodge", bins = 15) +
+  labs(title = "CGPA Score by Admission Status", x = "CGPA", y = "Count") +
+  scale_fill_discrete(labels = c("Not Admitted", "Admitted"))
+
+ggplot(admission_clean, aes(x = factor(University.Rating), fill = factor(Admission))) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "University Rating by Admission Status",
+    x = "University Rating",
+    y = "Number of Applicants",
+    fill = "Admission"
+  ) +
+  scale_fill_discrete(labels = c("Not Admitted", "Admitted"))
+```
+
+Create the following detailed plots using **ggplot2**:
+
+1. Histogram of GRE Scores by Admission status.
+2. Histogram of CGPA by Admission status.
+3. Bar plot: Applicants count per University Rating by Admission (interpret clearly).
+
+
+---
+
+# Dataset 2: Titanic (40%)
+
+You are provided with the dataset **`titanic.csv`**, containing passenger details and survival information.
+```{r}
+titanic <- read.csv("titanic.csv") 
+head(titanic,5)
+summary(titanic)
+str(titanic)
+colSums(is.na(titanic))
+sum(titanic$Cabin == "", na.rm = TRUE)
+sum(titanic$Embarked == "", na.rm = TRUE)
+```  
+## Part 1: Informative Analysis
+
+- Clearly describe features, their meanings, and statistics (mean, median, standard deviation, min, max).
+1. PassengerId
+Unique identifier for each passenger.
+
+Mean: 390.0 | Median: 390.0 | Min: 181 | Max: 599
+
+2. Survived
+Survival status: 0 = Did not survive, 1 = Survived.
+
+Mean: 0.42 → around 42% survived
+
+Min: 0 | Max: 1
+
+3. Pclass
+Ticket class: 1 = 1st class, 2 = 2nd class, 3 = 3rd class.
+
+Mean: 2.26 | Median: 3 | Mode: 3
+
+Min: 1 | Max: 3
+
+4. Name
+Passenger's full name (not used for numerical analysis).
+
+Text (Character) – includes title (Mr., Miss, etc.)
+
+5. Sex
+Gender: male or female.
+
+Categorical – useful for analyzing survival differences between genders.
+
+6. Age
+Passenger's age in years.
+
+Mean: 30.45 | Median: 29 | Min: 0.75 | Max: 71
+
+Missing values: 91 (≈22% of the data)
+
+7. SibSp
+Number of siblings or spouses aboard the Titanic.
+
+Mean: 0.49 | Median: 0 | Min: 0 | Max: 8
+
+8. Parch
+Number of parents or children aboard.
+
+Mean: 0.35 | Median: 0 | Min: 0 | Max: 4
+
+9. Ticket
+Ticket number (alphanumeric).
+
+Character – often inconsistent format, rarely useful without preprocessing.
+
+10. Fare
+Ticket fare paid (in British pounds).
+
+Mean: 33.68 | Median: 14.5 | Min: 0 | Max: 512.33
+
+11. Cabin
+Cabin number – often missing or partial.
+
+Mostly missing – not used unless heavily cleaned.
+
+12. Embarked
+Port of embarkation:
+
+C = Cherbourg, Q = Queenstown, S = Southampton
+Categorical – can be useful in grouping passengers.
+
+```{r}
+titanic %>%
+  group_by(Pclass) %>%
+  summarise(
+    count = sum(!is.na(Age)),
+    mean_age = mean(Age, na.rm = TRUE),
+    median_age = median(Age, na.rm = TRUE),
+    sd_age = sd(Age, na.rm = TRUE)
+  )
+
+titanic %>%
+  group_by(Sex, Survived) %>%
+  summarise(count = n()) %>%
+  arrange(Sex,desc(Survived))
+
+titanic %>%
+  group_by(Pclass, Survived) %>%
+  summarise(count = n()) %>%
+  arrange(Pclass, desc(Survived))
+  
+  
+titanic %>%
+  group_by(Sex, Pclass, Survived) %>%
+  summarise(count = n()) %>%
+  arrange(Sex, Pclass, desc(Survived))
+
+titanic %>%
+  group_by(Pclass, Sex) %>%
+  summarise(
+    mean_fare = mean(Fare, na.rm = TRUE),
+    median_fare = median(Fare, na.rm = TRUE),
+    min_fare = min(Fare, na.rm = TRUE),
+    count = n()
+  )
+  titanic %>%
+  group_by(SibSp, Survived) %>%
+  summarise(count = n()) %>%
+  arrange(SibSp, Survived, desc(Survived))
+```
+- Provide four detailed insights examining interesting or less obvious relationships:
+  - Does age distribution differ significantly by class?
+  
+  Passengers in 1st class tend to be older, with higher median and average age,3rd class includes more young passengers and children,These findings indicate that age distribution does vary significantly by class, likely reflecting the socioeconomic composition of the passengers.
+  
+  - Analyze survival rates based on gender and passenger class.
+  
+  The data clearly shows that women had much higher survival rates than men, and that passenger class also made a big difference.
+For example, in 1st class, only 2 out of 54 women didn’t survive – that's a survival rate of over 96%.
+In contrast, men in 3rd class had very low survival chances – only 23 out of 151 survived, which is about 15%.
+As we move from 1st to 3rd class, the survival rates drop for both men and women, but the difference is especially dramatic for men.
+Overall, we can see that being a female passenger in a higher class greatly increased the chance of survival on the Titanic.
+  
+  - Investigate if fare amount influenced survival differently in different passenger classes.
+  Looking at the fare data split by passenger class and gender, we can see some interesting patterns:
+
+In every class, women paid more on average than men.
+For example, in 1st class, women paid an average of 110.81, while men paid 66.25.
+
+In 2nd and 3rd class, the difference is smaller, but still noticeable:
+2nd class: women 19.73 vs. men 17.75
+3rd class: women 14.94 vs. men 11.69
+
+Also, the minimum fare for men is 0 in all classes, suggesting that some male passengers may have boarded for free (perhaps as crew, servants, or under special circumstances).
+This pulls the average down for men, especially in 1st class.
+These patterns suggest that fare price is correlated with both gender and class, and that women—especially in 1st class—tended to pay more, possibly because they had better cabins or were part of wealthier families.
+  
+  - Provide one additional insightful relationship of your own and discuss why it's interesting or important.
+One additional insightful relationship we found is between the number of siblings or spouses on board (SibSp) and the chance of survival.
+Passengers with no family aboard (SibSp = 0) had a survival rate of about 37% (108 out of 289), which is lower than those with exactly one sibling or spouse, who had a survival rate of 57% (57 out of 99).
+This suggests that having one close companion might have helped people survive—possibly due to emotional support or better coordination during the evacuation.
+However, as the number of family members increased beyond two, the survival rate dropped again, possibly because larger families had a harder time staying together or making it to lifeboats.
+This non-linear pattern makes the relationship interesting and potentially important for understanding group behavior in emergencies.
+
+## Part 2: Data Processing
+```{r}
+titanic_clean <- titanic %>%
+  select(-Cabin) %>%
+  mutate(
+    Age = replace_na(Age, median(Age, na.rm = TRUE)),
+    Embarked = ifelse(Embarked == "", Mode(Embarked), Embarked)
+  )
+glimpse(titanic_clean)
+```
+- Clearly and explicitly justify how you handle missing values in each feature. Your explanation should reflect an understanding of data quality and analytical considerations.
+
+Age is a continuous variable with potential outliers (e.g., infants and elderly).
+The median is a robust central measure that is not affected by extreme values, making it a reliable choice for imputation.
+
+Embarked is a categorical variable. Using the most common value preserves the distribution and avoids introducing bias when only 10 rows missing.
+
+The Cabin feature is missing in most observations and has inconsistent formatting.(318 rows missing)
+Imputing such a sparse and unstructured field would add noise rather than meaningful information.
+
+
+
+
+## Part 3: Data Visualization
+```{r}
+ggplot(titanic_clean, aes(x = Sex, fill = factor(Survived))) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Survival Rate by Sex",
+    x = "Gender",
+    y = "Passenger Count",
+    fill = "Survived"
+  ) +
+  scale_fill_discrete(labels = c("Not Survival", "Survival"))
+ggplot(titanic_clean,aes(x = factor(Survived), y = Age))+
+  geom_boxplot(fill = "plum")+
+  labs(
+    title = "Age Distribution by Survival Status",
+    x = "Survived (0 = No, 1 = Yes)",
+    y = "Age"
+  )
+ggplot(titanic_clean, aes(x = factor(Sex), y = Fare)) +
+  geom_boxplot(aes(fill = factor(Sex))) +
+  facet_wrap(~Pclass, labeller = labeller(Pclass = c(
+    "1" = "Class 1",
+    "2" = "Class 2",
+    "3" = "Class 3"
+  ))) +
+  labs(
+    title = "Fare Distribution by Gender and Passenger Class",
+    x = "Gender",
+    y = "Fare"
+  )
+survival_rates <- titanic_clean %>%
+  group_by(Pclass, Sex) %>%
+  summarise(
+    survived_rate = mean(Survived),
+    count = n()
+  )
+ggplot(survival_rates, aes(x = factor(Pclass), y = survived_rate, fill = Sex)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Survival Rate by Gender and Passenger Class",
+    x = "Passenger Class",
+    y = "Survival Rate"
+  ) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) 
+```
+Select and create **four informative plots** using **ggplot2**:
+
+- Clearly justify why each plot was chosen and discuss the insights each provides about the Titanic dataset. One plot should specifically focus on an interaction between three or more variables. Explain the complexity and your reasoning for this choice.
+
+ Plot 1: Survival Count by Gender – Justification and Insights
+This bar chart was chosen to visually compare survival outcomes between males and females.
+A grouped bar plot (using position = "dodge") is ideal for this, as it clearly separates survival counts by gender, allowing for an immediate side-by-side comparison.
+
+Bar plots are particularly effective when comparing categorical variables, such as Sex and Survived, especially when the goal is to highlight disparities between groups.
+
+Why this visualization is effective:
+It directly shows the contrast in survival numbers between genders.
+
+It makes it visually obvious that female passengers had a significantly higher survival count than males.
+
+Insight:
+The plot highlights a major historical and social dynamic — "women and children first" — reflected in the much higher survival count for women compared to men.
+
+Plot 2: Age Distribution by Survival Status – Justification and Insights
+This boxplot displays the distribution of passenger age for those who survived and those who did not.
+A boxplot is the ideal visualization in this case because it shows:
+
+The median age for each group
+
+The interquartile range (IQR), revealing variability
+
+Any outliers (e.g., very young or very old passengers)
+
+This type of plot is especially useful when comparing a continuous variable (Age) against a binary outcome (Survived), helping to identify differences in central tendency and spread.
+
+Insight:
+The median age of survivors is slightly lower, and their age range appears wider, including more young passengers.
+However, the distributions largely overlap, suggesting that age alone was not a strong determinant of survival though it may have interacted with other variables like sex or class.
+Interestingly, we also observe more extreme age outliers (very high or very low) among non-survivors particularly:
+
+Several elderly passengers who did not survive (ages 60+)
+
+And a few very young children or infants who also didn’t survive.
+These anomalies may reflect the challenges certain vulnerable groups faced, or limitations in evacuation procedures.
+
+Plot 3: Fare Distribution by Gender and Passenger Class – Justification and Insights
+This boxplot compares ticket prices between male and female passengers, separated by travel class.
+Using facet_wrap() allows us to clearly examine whether fare differences between genders exist within each class.
+
+Boxplots are ideal for showing central tendencies (median), variability, and outliers, making it easy to compare the fare distributions.
+
+Insight:
+In 1st class, female passengers show several extremely high fare outliers, suggesting that some women may have traveled in luxury private cabins or were part of high status groups.
+
+Among male passengers, we observe some zero fare entries, which may indicate special cases such as crew members, employees, or individuals who were not required to pay.
+
+In both 2nd and 3rd class, the fare distributions are generally lower and more compact, with no major gender-based deviations in the middle range.
+
+This visualization provides a nuanced look at how ticket price, gender, and class intersect, offering insight into possible privilege, status, or special arrangements that certain passengers may have had — especially in 1st class.
+
+ Plot 4: Survival Rate by Gender and Passenger Class  Justification and Insights
+This grouped bar plot displays the survival rate of Titanic passengers, broken down by both gender and passenger class.
+Each bar represents the proportion of survivors within a specific subgroup rather than absolute counts.
+
+Using geom_col() with grouped bars is ideal here, as it enables clear comparisons across multiple categories, while fill = Sex adds a visual layer for gender differences.
+
+Why this visualization is effective:
+It allows us to observe the interaction between two categorical predictors (Sex and Pclass) on the survival outcome.
+
+It highlights relative trends (survival rates) rather than just frequencies, making it easier to interpret the impact of social and structural factors on survival.
+
+Insights:
+Female passengers in 1st class had the highest survival rate, with nearly all surviving.
+
+Male passengers in 3rd class had the lowest survival rate, with fewer than 20% surviving.
+
+The gender gap is most pronounced in 1st and 3rd class, indicating that both gender and socioeconomic status played a critical role in survival outcomes.
+
+This visualization provides a clear, interpretable summary of a three-variable interaction, making it a strong choice for a complex pattern in the data.
+
+---

@@ -1,0 +1,249 @@
+---
+title: "HW3: Predicting IMDb Ratings for *The Office* Episodes"
+output:
+  html_document:
+    toc: true
+---
+
+
+### Instructions
+
+1. All assignments are individual!
+2. This assignment should be uploaded as one html file (after knit) before the next Tutorial.
+3. Questions about the assignment should be asked using the Assignments forums. 
+5. Write your name and id at the top of the file 
+
+
+**Exercise overview:** Build, document, and evaluate a regression model that predicts the IMDb rating of each episode of *The Office* using features you engineer from the raw dialogue and episode metadata. You are free to choose **any modelling approach** and **any feature set** you believe will perform well.
+
+  
+**Dataset.** `theoffice` from the **schrute** package.
+
+---
+
+## 0 Setup
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = TRUE)
+set.seed(123)   # make your work reproducible!
+```
+
+Install/load the packages you will need: **tidyverse**, **lubridate**, **tidymodels**, **GGally**, and any others you choose (e.g., **vip** for variable‑importance plots).
+
+```{r packages}
+# TODO: load libraries here
+library(tidyverse)
+library(lubridate)
+library(tidymodels)
+library(GGally)
+library(vip)
+```
+
+---
+
+## 1 Data preparation 
+
+Construct a data frame `office_df` with the following columns:
+
+| variable | description |
+|----------|-------------|
+| `imdb_rating`  | numeric rating at IMDb (target) |
+| `total_votes`  | number of IMDb votes (will be log‑transformed) |
+| `season` & `episode` | numeric identifiers |
+| `halloween`, `valentine`, `christmas` | factor indicators (1/0) for holiday episodes |
+| `michael_ep`   | 1 if Michael Scott appears (season ≤ 7), else 0 |
+| `lines_jim`, `lines_pam`, `lines_michael`, `lines_dwight` | proportion of lines spoken by each character |
+
+
+
+```{r data-prep}
+# TODO: build office_df here
+library(schrute)
+data("theoffice")
+
+#Count lines for main characters per episode
+lines_per_character <- theoffice %>%
+  filter(character %in% c("Jim", "Pam", "Michael", "Dwight")) %>%
+  group_by(season, episode, character) %>%
+  summarise(lines = n(), .groups = "drop")
+
+#Calculate total lines per episode
+total_lines_per_episode <- lines_per_character %>%
+  group_by(season, episode) %>%
+  summarise(total_lines = sum(lines), .groups = "drop")
+
+#Calculate proportion of lines per character
+lines_proportion <- lines_per_character %>%
+  left_join(total_lines_per_episode, by = c("season", "episode")) %>%
+  mutate(prop = lines / total_lines) %>%
+  select(season, episode, character, prop)
+
+# Pivot wider and rename columns
+lines_wide <- lines_proportion %>%
+  pivot_wider(
+    names_from = character,
+    values_from = prop,
+    values_fill = 0
+  ) %>%
+  rename(
+    lines_jim = Jim,
+    lines_pam = Pam,
+    lines_michael = Michael,
+    lines_dwight = Dwight
+  )
+
+#IMDb ratings and votes
+ratings_df <- theoffice %>%
+  distinct(season, episode, imdb_rating, total_votes)
+
+# Identify holiday episodes
+holiday_df <- theoffice %>%
+  distinct(season, episode, episode_name) %>%
+  mutate(
+    halloween = ifelse(grepl("halloween", episode_name, ignore.case = TRUE), 1, 0),
+    christmas = ifelse(grepl("christmas", episode_name, ignore.case = TRUE), 1, 0),
+    valentine = ifelse(grepl("valentine", episode_name, ignore.case = TRUE), 1, 0)
+  ) %>%
+  select(-episode_name)
+
+#Create Michael Scott appearance indicator
+michael_df <- theoffice %>%
+  distinct(season, episode) %>%
+  mutate(michael_ep = ifelse(season <= 7, 1, 0))
+
+#Merge all into office_df
+office_df <- lines_wide %>%
+  left_join(ratings_df, by = c("season", "episode")) %>%
+  left_join(holiday_df, by = c("season", "episode")) %>%
+  left_join(michael_df, by = c("season", "episode"))
+
+glimpse(office_df)
+```
+
+---
+
+## 2 Train / test split 
+
+* Create an 80/20 stratified split on `imdb_rating`.
+
+```{r split}
+set.seed(123)
+office_split <- initial_split(office_df,prop = 0.80)
+train_data <- training(office_split)
+test_data <- testing(office_split)
+glimpse(train_data)
+glimpse(test_data)
+# TODO: office_split, office_train, office_test
+```
+
+---
+
+## 3 Recipe 
+
+* **Label:** `imdb_rating` (numeric).
+* **Predictors:** use **any features you create in Section 1**—feel free to start with the full set or experiment with subsets/interactions.  
+* **Pre‑processing:** add any steps you find helpful. Does the dataset include imbalanced classes? If so, how would you address that?
+In this recipe, I prepared the data to be ready for modeling. Here are the steps I took:
+
+Removed holiday indicators (halloween, christmas, and valentine) because they were extremely unbalanced — only a few episodes had them, so I didn’t want them to add noise to the model.
+
+Applied a log transformation to the total_votes column. This helps reduce skewness since the number of votes varies a lot between episodes.
+
+Converted categorical variables to dummy variables using step_dummy(), which is useful for modeling since many algorithms don’t work directly with text or factors.
+
+```{r recipe}
+# TODO: rating_rec <- 
+office_rec <- recipe(
+  imdb_rating ~ .,      
+  data = train_data   
+)
+
+ggplot(train_data, aes(imdb_rating)) +
+  geom_histogram(binwidth = 0.2, fill = "steelblue", color = "white") +
+  labs(title = "Distribution of IMDb Ratings")
+table(office_df$valentine)
+table(office_df$halloween)
+table(office_df$christmas)
+table(office_df$season)
+summary(office_df$lines_dwight)
+
+office_rec_2 <- recipe(imdb_rating ~ ., data = train_data) %>%
+  step_rm(halloween, christmas, valentine) %>% 
+  step_log(total_votes, base = 10) %>%        
+  step_dummy(all_nominal_predictors()) %>%      
+  step_zv(all_predictors()) 
+office_prep <- prep(office_rec_2)
+bake(office_prep, new_data = NULL) %>% colnames()
+
+
+```
+
+---
+
+## 4 Model specification & workflow 
+
+* Briefly explain *why* its a regression problem and not a classification 
+imdb_rating is a numeric continuous variable, so regression is appropriate.
+* Create a model specification.  
+* Combine the recipe and model into a `workflow`.
+
+```{r workflow}
+office_mod <- linear_reg() %>%
+  set_engine("lm")
+office_wf <- workflow() %>%
+  add_model(office_mod) %>%
+  add_recipe(office_rec_2)
+# TODO
+```
+
+
+---
+
+## 5 Fit model & interpret 
+
+* Fit the workflow on the **training** data.  
+* Evaluate variable importance.  
+* Provide a brief interpretation of at least **two** influential predictors.
+
+We trained a linear regression model on the training data. The most important predictors were total_votes (log-transformed), which had a strong positive effect on rating, and michael_ep, showing that episodes with Michael Scott generally got higher ratings. Other variables like season and lines_dwight also had some effect. lines_pam was dropped due to linear dependence, since the character proportions sum to 1 — the model can infer it from the others.
+
+```{r fit}
+office_fit <- office_wf  %>%
+fit(data = train_data)
+nrow(tidy(office_fit))
+tidy(office_fit)%>% print(n = 9)
+
+train_data %>%
+  select(lines_jim, lines_pam, lines_michael, lines_dwight) %>%
+  cor()
+
+# TODO
+```
+
+
+---
+
+## 6 Evaluate on the test set 
+
+* Predict on `office_test` and evaluate the results using fit evaluation metrics.
+
+```{r evaluate}
+# TODO
+office_preds <- predict(office_fit, test_data) %>%
+  bind_cols(test_data)
+metrics(office_preds, truth = imdb_rating, estimate = .pred)
+
+```
+
+Discuss whether the model meets your expectations.
+
+---
+
+## 7 Reflection 
+
+Yes, the model mostly met my expectations. I had a feeling it would perform reasonably well, especially since we saw a strong relationship between the number of votes and the IMDb rating. That, combined with other features like the proportion of lines by key characters, gave the model a good foundation. The RMSE and R² confirm that it's picking up on meaningful patterns, even with a relatively simple setup. If I had more time, I would also try running the model with different seeds and averaging the results to improve robustness in addition I would explore richer feature engineering—especially from the actual dialogue. For example, I’d try using a language model (LLM) to extract sentiment or key themes from highly rated episodes. That could give the model deeper insight into what makes an episode resonate with viewers.
+
+Describe **one** concrete improvement you would attempt if you had more time.
+
+---
+
